@@ -7,6 +7,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 
 ## [Unreleased]
 
+### Added — routing choice in the audit trail (#628)
+
+- `RouteDecision` takes an optional `ranking` (`RouteOption` / `RouteRanking` in `@corridor/router`).
+  The engine records the chosen option, its label and rank, and the reasons of the top three
+  options as `route` on the run's first audit entry out of `created`; `PostgresAuditSink`
+  keeps it in `detail`. Without a ranking the receiving adapter is recorded as the only option.
+  See `docs/route-resolver.md#recording-the-choice`.
+
 ### Added — a custody statement ([#707](https://github.com/corridor-in-a-box/corridor-in-a-box/issues/707))
 
 - `docs/custody.md` says in one place that the project never holds funds or a key that can

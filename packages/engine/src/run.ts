@@ -17,6 +17,7 @@ import {
   type PaymentIntent,
 } from "@corridor/types";
 import type { RouteDecision, RouteResolver } from "@corridor/router";
+import { routeChoiceFor } from "./route-choice";
 import {
   AdapterQuoteProvider,
   ExternalQuoteProvider,
@@ -74,6 +75,7 @@ import {
   type Logger,
   type Metrics,
   type RequestScope,
+  type RouteChoice,
 } from "./observability";
 import type { CheckResult, GateContext, PreSettleGate } from "./gate";
 import {
@@ -502,6 +504,7 @@ export async function execute(
     pollMs,
     adapter,
     routeTrust,
+    routeChoice: routeChoiceFor(route),
     recordOutcome,
   });
   const { advance, die, finishFailure } = context;
@@ -968,6 +971,8 @@ interface AdvanceMeta {
   amountRefunded?: string;
   amountFee?: string;
   checks?: readonly CheckResult[];
+  /** Set by `advance` itself on the first transition out of `created`. */
+  route?: RouteChoice;
 }
 
 interface RunContext {
@@ -1001,6 +1006,11 @@ interface RunContextInit {
   /** Receiving-anchor adapter, used to watch an anchor-driven refund. */
   adapter: AnchorAdapter;
   routeTrust?: "attested" | "manifest";
+  /**
+   * The routing choice, recorded once on the run's first transition out of
+   * `created` (a resumed run that already left `created` never re-records it).
+   */
+  routeChoice?: RouteChoice;
   /** Reports a resolved run to the circuit breaker (no-op without `deps.health`). */
   recordOutcome: RecordOutcome;
 }
@@ -1021,6 +1031,7 @@ function createRunContext(init: RunContextInit): RunContext {
     pollMs,
     adapter,
     routeTrust,
+    routeChoice,
     recordOutcome,
   } = init;
 
@@ -1038,6 +1049,7 @@ function createRunContext(init: RunContextInit): RunContext {
     else if (from === "verifying" && gateChecks && !meta?.checks) {
       meta = { ...meta, checks: gateChecks };
     }
+    if (from === "created" && routeChoice) meta = { ...meta, route: routeChoice };
     run.state = to;
     run.version += 1;
     trail.push(to);
@@ -1190,11 +1202,12 @@ async function failRun(
   init: Pick<
     RunContextInit,
     "run" | "trail" | "deps" | "store" | "now" | "routeTrust" | "recordOutcome"
-  >,
+  > &
+    Partial<Pick<RunContextInit, "routeChoice">>,
   error: CorridorError,
   checks?: readonly CheckResult[],
 ): Promise<Err> {
-  const { run, trail, deps, store, now, routeTrust, recordOutcome } = init;
+  const { run, trail, deps, store, now, routeTrust, routeChoice, recordOutcome } = init;
   if (!canTransition(run.state, "failed")) return { ok: false, error };
   const from = run.state;
   run.lastError = `${error.code}: ${error.message}`;
@@ -1209,7 +1222,12 @@ async function failRun(
     now(),
     run.lastError,
     routeTrust,
-    checks ? { checks } : undefined,
+    checks || (from === "created" && routeChoice)
+      ? {
+          ...(checks && { checks }),
+          ...(from === "created" && routeChoice && { route: routeChoice }),
+        }
+      : undefined,
   );
   await recordOutcome("failed", error);
   return { ok: false, error };
@@ -1286,6 +1304,7 @@ async function emitTransition(
     amountRefunded?: string;
     amountFee?: string;
     checks?: readonly CheckResult[];
+    route?: RouteChoice;
   },
 ): Promise<void> {
   const entry: AuditEntry = {
@@ -1303,6 +1322,7 @@ async function emitTransition(
     ...(meta?.amountFee !== undefined && { amountFee: meta.amountFee }),
     // A copy, so a caller mutating its array afterwards cannot change what was recorded.
     ...(meta?.checks && meta.checks.length > 0 && { checks: [...meta.checks] }),
+    ...(meta?.route && { route: meta.route }),
   };
   const logger = deps.logger ?? silentLogger;
   // One line per check, logged once when the results arrive; the transition
@@ -1398,6 +1418,7 @@ async function resumeRun(
     pollMs,
     adapter: route.receiving,
     routeTrust: route.trust,
+    routeChoice: routeChoiceFor(route),
     recordOutcome,
   });
 
