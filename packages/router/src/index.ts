@@ -9,17 +9,26 @@
 import type { Corridor } from "@corridor/manifest";
 import type { AnchorAdapter, SourceAnchorAdapter } from "@corridor/adapter-kit";
 import type { PaymentIntent } from "@corridor/types";
+import type { AllowedPriceLabel } from "./label-policy";
 
 /**
  * One option a resolver considered for a payment, with why it ranked where it
  * did. Reasons are short, PII-free strings (e.g. "attested 2h ago",
  * "p95 settle 41s"): they are written to the append-only audit trail.
+ *
+ * Deliberately not RFC 0004's planned `RouteOption`: this is only the part of
+ * an option the audit trail keeps about a choice.
  */
-export interface RouteOption {
+export interface RankedOption {
   /** Stable id for the option, e.g. the receiving anchor's adapter name or domain. */
   readonly id: string;
-  /** Human-readable label for operators, e.g. "Anchor X (MXN, SPEI)". */
-  readonly label: string;
+  /**
+   * The RFC 0004 price label of the option's price: `locked` (a firm SEP-38
+   * quote), `indicative` (the anchor's current price, not promised) or
+   * `estimated` (from rate history). Omit it for an option that could not be
+   * priced. See docs/rfcs/0004-smart-router.md#2-price-labels-shown-to-people.
+   */
+  readonly label?: AllowedPriceLabel;
   /** 1-based rank; 1 is the best option. */
   readonly rank: number;
   /** Why the option ranked where it did, most important first. */
@@ -27,11 +36,11 @@ export interface RouteOption {
 }
 
 /** How a resolver ranked its options, so the choice can be explained later. */
-export interface RouteRanking {
+export interface OptionRanking {
   /** `id` of the option the resolver chose; it should match `receiving`. */
   readonly chosen: string;
   /** Every option considered, in any order; the engine audits the top three by rank. */
-  readonly options: readonly RouteOption[];
+  readonly options: readonly RankedOption[];
 }
 
 export interface RouteDecision {
@@ -49,11 +58,11 @@ export interface RouteDecision {
   readonly trust: "attested" | "manifest";
   /**
    * Optional ranking behind the choice. When present the engine records the
-   * chosen option and the top three options with their reasons in the audit
-   * trail; when absent it records the receiving adapter as the only option.
+   * chosen option with its price label and rank, and the top three options
+   * with their reasons, in the audit trail; when absent it records the receiving adapter as the only option.
    * See docs/route-resolver.md#recording-the-choice.
    */
-  readonly ranking?: RouteRanking;
+  readonly ranking?: OptionRanking;
 }
 
 /**

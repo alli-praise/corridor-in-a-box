@@ -504,7 +504,7 @@ export async function execute(
     pollMs,
     adapter,
     routeTrust,
-    routeChoice: routeChoiceFor(route),
+    routeDecision: route,
     recordOutcome,
   });
   const { advance, die, finishFailure } = context;
@@ -1007,10 +1007,12 @@ interface RunContextInit {
   adapter: AnchorAdapter;
   routeTrust?: "attested" | "manifest";
   /**
-   * The routing choice, recorded once on the run's first transition out of
-   * `created` (a resumed run that already left `created` never re-records it).
+   * The route decision whose choice is recorded once, on the run's first
+   * transition out of `created` (a resumed run that already left `created`
+   * never re-records it). Turned into a `RouteChoice` at that moment, so the
+   * chosen option can fall back to the run's own quote label.
    */
-  routeChoice?: RouteChoice;
+  routeDecision?: RouteDecision;
   /** Reports a resolved run to the circuit breaker (no-op without `deps.health`). */
   recordOutcome: RecordOutcome;
 }
@@ -1031,7 +1033,7 @@ function createRunContext(init: RunContextInit): RunContext {
     pollMs,
     adapter,
     routeTrust,
-    routeChoice,
+    routeDecision,
     recordOutcome,
   } = init;
 
@@ -1049,7 +1051,9 @@ function createRunContext(init: RunContextInit): RunContext {
     else if (from === "verifying" && gateChecks && !meta?.checks) {
       meta = { ...meta, checks: gateChecks };
     }
-    if (from === "created" && routeChoice) meta = { ...meta, route: routeChoice };
+    if (from === "created" && routeDecision) {
+      meta = { ...meta, route: routeChoiceFor(routeDecision, run.priceLabel) };
+    }
     run.state = to;
     run.version += 1;
     trail.push(to);
@@ -1203,13 +1207,17 @@ async function failRun(
     RunContextInit,
     "run" | "trail" | "deps" | "store" | "now" | "routeTrust" | "recordOutcome"
   > &
-    Partial<Pick<RunContextInit, "routeChoice">>,
+    Partial<Pick<RunContextInit, "routeDecision">>,
   error: CorridorError,
   checks?: readonly CheckResult[],
 ): Promise<Err> {
-  const { run, trail, deps, store, now, routeTrust, routeChoice, recordOutcome } = init;
+  const { run, trail, deps, store, now, routeTrust, routeDecision, recordOutcome } = init;
   if (!canTransition(run.state, "failed")) return { ok: false, error };
   const from = run.state;
+  const route =
+    from === "created" && routeDecision
+      ? routeChoiceFor(routeDecision, run.priceLabel)
+      : undefined;
   run.lastError = `${error.code}: ${error.message}`;
   run.state = "failed";
   run.version += 1;
@@ -1222,12 +1230,7 @@ async function failRun(
     now(),
     run.lastError,
     routeTrust,
-    checks || (from === "created" && routeChoice)
-      ? {
-          ...(checks && { checks }),
-          ...(from === "created" && routeChoice && { route: routeChoice }),
-        }
-      : undefined,
+    checks || route ? { ...(checks && { checks }), ...(route && { route }) } : undefined,
   );
   await recordOutcome("failed", error);
   return { ok: false, error };
@@ -1418,7 +1421,7 @@ async function resumeRun(
     pollMs,
     adapter: route.receiving,
     routeTrust: route.trust,
-    routeChoice: routeChoiceFor(route),
+    routeDecision: route,
     recordOutcome,
   });
 

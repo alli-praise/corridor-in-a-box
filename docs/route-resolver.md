@@ -83,7 +83,8 @@ changelog entry.
 
 ### Recording the choice
 
-A resolver can explain its choice by returning an optional `ranking`:
+A resolver can explain its choice by returning an optional `ranking` (an
+`OptionRanking` of `RankedOption`s, both exported from `@corridor/router`):
 
 ```ts
 return {
@@ -94,15 +95,21 @@ return {
     options: [
       {
         id: "anchor-x",
-        label: "Anchor X (MXN, SPEI)",
+        label: "locked",
         rank: 1,
         reasons: ["attested 2h ago", "lowest total fee 0.45%"],
       },
-      { id: "anchor-y", label: "Anchor Y", rank: 2, reasons: ["fee 0.60%"] },
+      { id: "anchor-y", label: "indicative", rank: 2, reasons: ["fee 0.60%"] },
     ],
   },
 };
 ```
+
+`label` is the option's RFC 0004 price label: `locked` (a firm SEP-38 quote),
+`indicative` (the anchor's current price, not promised) or `estimated` (from
+rate history). See
+[RFC 0004, section 2](rfcs/0004-smart-router.md#2-price-labels-shown-to-people).
+Leave it out for an option that could not be priced.
 
 The engine records it once, on the run's first transition out of `created`
 (including when that transition is to `failed`), as the audit entry's `route`
@@ -111,15 +118,15 @@ field:
 ```json
 {
   "route": {
-    "chosen": { "id": "anchor-x", "label": "Anchor X (MXN, SPEI)", "rank": 1 },
+    "chosen": { "id": "anchor-x", "label": "locked", "rank": 1 },
     "top": [
       {
         "id": "anchor-x",
-        "label": "Anchor X (MXN, SPEI)",
+        "label": "locked",
         "rank": 1,
         "reasons": ["attested 2h ago", "lowest total fee 0.45%"]
       },
-      { "id": "anchor-y", "label": "Anchor Y", "rank": 2, "reasons": ["fee 0.60%"] }
+      { "id": "anchor-y", "label": "indicative", "rank": 2, "reasons": ["fee 0.60%"] }
     ]
   }
 }
@@ -128,8 +135,16 @@ field:
 - `top` holds at most three options, best rank first; ties keep the resolver's order.
 - Each option keeps at most five reasons, and every string is capped at 200
   characters. Reasons go into the append-only trail, so keep them PII-free.
+- `chosen.label` is the label the resolver gave the chosen option. When it gave
+  none, the run's own quote label is used instead (`locked` for a firm quote,
+  `indicative` otherwise, the same value the run stores as `priceLabel`). It is
+  left out only when neither is known, for example a run that failed before it
+  was quoted.
+- Only `locked`, `indicative` and `estimated` are recorded. Any other `label`
+  value is dropped.
 - Without a `ranking`, or when `chosen` matches no option, the receiving
-  adapter's `name` is recorded as the single rank-1 option.
+  adapter's `name` is recorded as the single rank-1 option, labelled with the
+  run's quote label.
 - `PostgresAuditSink` stores `route` in the `detail` jsonb column; `listAudit()`
   returns it unchanged. A resumed run that has already left `created` does not
   record it again.
