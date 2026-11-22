@@ -23,6 +23,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
   move them: who holds the money at each step of a payment, the one key on the money path and
   who holds it, what the project does and does not do, and the keys it does hold (attester,
   registry admin, testnet CI seeds), none of which can move money. Linked from the README.
+
 ### Added — onboarding exporter framework ([#639](https://github.com/corridor-in-a-box/corridor-in-a-box/issues/639))
 
 - `@corridor/adapter-kit` exports a minimal `BusinessProfile`, the `OnboardingExporter`
@@ -30,6 +31,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
   exporter maps the profile onto one receiver's own onboarding form.
   `examples/onboarding/example-receiver-exporter.ts` is a reference exporter, and
   `docs/onboarding-exporters.md` explains how to add one.
+
 ### Added — SEP-10 lane check with the business's own key ([#631](https://github.com/corridor-in-a-box/corridor-in-a-box/issues/631))
 
 - `checkLane(corridor, { signer, fetchImpl?, timeoutMs? })` in `@corridor/router` runs
@@ -42,6 +44,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 - `tests/lane-check.test.ts` drives stub anchors that accept and refuse the signed
   challenge, plus server-error, unreachable and no-endpoint cases; it also asserts the
   JWT never reaches the result. Design context in `docs/rfcs/0004-smart-router.md`.
+
 ### Added — error screens for the testnet send app ([#691](https://github.com/corridor-in-a-box/corridor-in-a-box/issues/691))
 
 - `web/components/SendErrorState.tsx` renders a screen for each way a payment cannot go ahead: no routes,
@@ -49,6 +52,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 - `web/lib/send-errors.ts` holds the wording. A failed payment is worded from its error code alone, so
   anchor URLs and upstream response bodies in the raw message are never shown.
 - `tests/web-send-errors.test.ts` covers each state.
+
 ### Added — live crash-resume scenario against the reference anchor ([#677](https://github.com/corridor-in-a-box/corridor-in-a-box/issues/677))
 
 - `pnpm verify:crash-resume` kills the service with `SIGKILL` after the payment has settled on
@@ -56,6 +60,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
   same transaction hash. It also checks Horizon for exactly one matching payment transaction.
 - The `reference-crash-resume` workflow runs it daily and on demand, writes the result to the
   job summary and uploads the service and anchor logs on failure.
+
 ### Added — a schema for `contracts/deployments.json` and the testnet upgrade record ([#701](https://github.com/corridor-in-a-box/corridor-in-a-box/issues/701))
 
 - `contracts/deployments.schema.json` describes deployments and upgrades (wasm hash, transaction
