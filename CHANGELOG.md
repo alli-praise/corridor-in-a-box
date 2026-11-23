@@ -16,6 +16,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
   `detail`. When the resolver gives the chosen option no label, the run's own quote label is
   recorded. Without a ranking the receiving adapter is recorded as the only option.
   See `docs/route-resolver.md#recording-the-choice`.
+### Added — `RouteRequest`, `RoutePolicy`, `PriceLabel`, `RouteOption` and `RoutePlanner` types ([#603](https://github.com/corridor-in-a-box/corridor-in-a-box/issues/603))
+
+- `@corridor/router` exports `RouteRequest`, `RoutePolicy`, `PriceLabel`, `RouteOption` and
+  `RoutePlanner` (`packages/router/src/planner.ts`), matching the route planner interface sketch
+  in `docs/rfcs/0004-smart-router.md` §1 with TSDoc on every type and field.
 
 ### Added — a custody statement ([#707](https://github.com/corridor-in-a-box/corridor-in-a-box/issues/707))
 
@@ -69,6 +74,16 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 - `contracts/deployments.json` records the 2026-11-17 testnet `upgrade()` of the registry and the
   attester. The hashes were read from the testnet ledger, not estimated.
 - `tests/deployments.test.ts` validates the file and checks that missing or malformed fields fail.
+
+### Changed — `testanchor-sep6` records its blocked payout attempt ([#649](https://github.com/corridor-in-a-box/corridor-in-a-box/issues/649))
+
+- `corridors/testanchor-sep6.corridor.yaml` now records the 2026-11-22 payout attempt: a funded
+  testnet account passed SEP-10 and SEP-12 and opened SEP-6 withdrawal
+  `19a2872f-278c-4867-9931-7e7f82ee67a6`, but it stayed `incomplete` with no
+  `withdraw_anchor_account`, so no Stellar payment could be sent.
+- `/sep6/withdraw-exchange` rejects USDC with HTTP 400 and the transaction's `more_info_url`
+  is the SEP-24 reference UI, whose business-server calls return 401 for the SEP-6 token.
+  No `proof:` block was added, because no payout completed.
 
 ### Fixed — stale documentation and comments
 
